@@ -7,6 +7,13 @@ public class UserCognitoDTO {
     private String name;
     private String status;
 
+    public UserCognitoDTO(String username,String status, String email, String name) {
+        this.username = username;
+        this.email = email;
+        this.name = name;
+        this.status = status;
+    }
+
     public String getUsername() {
         return username;
     }

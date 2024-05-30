@@ -6,8 +6,6 @@ public class ConfirmDTO {
 
     private String code;
 
-    private String clientId;
-
     public String getEmail() {
         return email;
     }
@@ -24,12 +22,4 @@ public class ConfirmDTO {
         this.code = code;
     }
 
-
-    public String getClientId() {
-        return clientId;
-    }
-
-    public void setClientId(String clientId) {
-        this.clientId = clientId;
-    }
 }
