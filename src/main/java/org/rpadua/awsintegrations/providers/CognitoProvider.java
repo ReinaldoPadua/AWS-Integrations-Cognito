@@ -1,10 +1,9 @@
 package org.rpadua.awsintegrations.providers;
 
-import org.rpadua.awsintegrations.DTOs.CognitoClientDTO;
-import org.rpadua.awsintegrations.DTOs.ConfirmDTO;
-import org.rpadua.awsintegrations.DTOs.RegisterDTO;
-import org.rpadua.awsintegrations.DTOs.UserCognitoDTO;
+import org.rpadua.awsintegrations.DTOs.*;
 import org.rpadua.awsintegrations.util.AwsUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -15,6 +14,8 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -66,7 +67,7 @@ public class CognitoProvider {
             )).collect(Collectors.toList());
 
         } catch (CognitoIdentityProviderException e) {
-            throw new Exception();
+            throw new Exception(e.awsErrorDetails().errorMessage());
         } finally {
             this.cognitoClient.close();
         }
@@ -101,17 +102,17 @@ public class CognitoProvider {
             this.cognitoClient.signUp(signUpRequest);
 
         } catch (CognitoIdentityProviderException e) {
-            throw new Exception(e);
+            throw new Exception(e.awsErrorDetails().errorMessage());
         } finally {
             this.cognitoClient.close();
         }
     }
 
-    public void confirmSignUp(String userPoll,ConfirmDTO confirmDTO) throws Exception {
+    public void confirmSignUp(String userPool,ConfirmDTO confirmDTO) throws Exception {
         try {
             this.initCognitoClient();
 
-            CognitoClientDTO cognitoClient = AwsUtils.getCognitoClient(userPoll,this.USER_POOL_IDS);
+            CognitoClientDTO cognitoClient = AwsUtils.getCognitoClient(userPool,this.USER_POOL_IDS);
 
             ConfirmSignUpRequest signUpRequest = ConfirmSignUpRequest.builder()
                     .clientId(cognitoClient.getClientId())
@@ -125,9 +126,42 @@ public class CognitoProvider {
             this.cognitoClient.confirmSignUp(signUpRequest);
 
         } catch (CognitoIdentityProviderException e) {
-            throw new Exception(e);
+            throw new Exception(e.awsErrorDetails().errorMessage());
         } finally {
             this.cognitoClient.close();
         }
+    }
+
+    public AdminInitiateAuthResponse signIn(String userPool, SignInDTO signInDTO) throws Exception {
+
+        try {
+            this.initCognitoClient();
+
+            CognitoClientDTO cognitoClient = AwsUtils.getCognitoClient(userPool,this.USER_POOL_IDS);
+
+            Map<String, String> authParameters = new ConcurrentHashMap<>();
+            authParameters.put("USERNAME", signInDTO.getEmail());
+            authParameters.put("PASSWORD", signInDTO.getPassword());
+            authParameters.put("SECRET_HASH", AwsUtils.calculateSecretHash(cognitoClient.getClientId(),
+                    cognitoClient.getSecretClient(),
+                    signInDTO.getEmail()));
+
+
+            AdminInitiateAuthRequest authRequest = AdminInitiateAuthRequest.builder()
+                    .clientId(cognitoClient.getClientId())
+                    .userPoolId(cognitoClient.getUserPoolId())
+                    .authParameters(authParameters)
+                    .authFlow(AuthFlowType.ADMIN_USER_PASSWORD_AUTH)
+                    .build();
+
+            AdminInitiateAuthResponse response = this.cognitoClient.adminInitiateAuth(authRequest);
+            return response;
+
+        } catch (CognitoIdentityProviderException e) {
+            throw new Exception(e.awsErrorDetails().errorMessage());
+        } finally {
+            this.cognitoClient.close();
+        }
+
     }
 }
