@@ -6,13 +6,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.*;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,11 +19,7 @@ import java.util.stream.Collectors;
 @Service
 public class CognitoProvider {
 
-    @Value("${aws.credentials.access-key-id}")
-    private String AWS_ACCESS_KEY;
-
-    @Value("${aws.credentials.secret-access-key-id}")
-    private String AWS_SECRET_ACCESS_KEY;
+    Logger logger = LoggerFactory.getLogger(CognitoProvider.class);
 
     @Value("${aws.cognito.user-pool-ids}")
     private String[] USER_POOL_IDS;
@@ -39,8 +33,6 @@ public class CognitoProvider {
 
     private void initCognitoClient(){
         this.cognitoClient = CognitoIdentityProviderClient.builder()
-                .region(Region.US_EAST_1)
-                .credentialsProvider(() -> AwsBasicCredentials.create(AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY))
                 .build();
     }
 
@@ -60,13 +52,15 @@ public class CognitoProvider {
                     userType.username(),userType.userStatusAsString(),
                     userType.attributes().stream().filter(
                             u-> u.name().equals("email")
-                    ).map(u -> u.value()).findFirst().get(),
+                    ).map(AttributeType::value).findFirst().orElse(null),
                     userType.attributes().stream().filter(
                             u-> u.name().equals("name")
-                    ).map(u -> u.value()).findFirst().get()
+                    ).map(AttributeType::value).findFirst().orElse(null)
             )).collect(Collectors.toList());
 
         } catch (CognitoIdentityProviderException e) {
+            logger.debug(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
+                    e.awsErrorDetails().serviceName(),e.awsErrorDetails().errorMessage()));
             throw new Exception(e.awsErrorDetails().errorMessage());
         } finally {
             this.cognitoClient.close();
@@ -102,6 +96,8 @@ public class CognitoProvider {
             this.cognitoClient.signUp(signUpRequest);
 
         } catch (CognitoIdentityProviderException e) {
+            logger.debug(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
+                    e.awsErrorDetails().serviceName(),e.awsErrorDetails().errorMessage()));
             throw new Exception(e.awsErrorDetails().errorMessage());
         } finally {
             this.cognitoClient.close();
@@ -154,10 +150,11 @@ public class CognitoProvider {
                     .authFlow(AuthFlowType.ADMIN_USER_PASSWORD_AUTH)
                     .build();
 
-            AdminInitiateAuthResponse response = this.cognitoClient.adminInitiateAuth(authRequest);
-            return response;
+            return this.cognitoClient.adminInitiateAuth(authRequest);
 
         } catch (CognitoIdentityProviderException e) {
+            logger.debug(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
+                    e.awsErrorDetails().serviceName(),e.awsErrorDetails().errorMessage()));
             throw new Exception(e.awsErrorDetails().errorMessage());
         } finally {
             this.cognitoClient.close();
