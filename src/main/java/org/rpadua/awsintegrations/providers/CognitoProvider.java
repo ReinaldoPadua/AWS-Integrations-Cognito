@@ -11,6 +11,7 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.*;
 
 import java.util.ArrayList;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -68,7 +69,7 @@ public class CognitoProvider {
 
     }
 
-    public void signUp(String userPoll,RegisterDTO registerDTO) throws Exception {
+    public void signUp(String userPoll, SignUpRequestDTO signUpRequestDTO) throws Exception {
 
         try {
             this.initCognitoClient();
@@ -77,20 +78,22 @@ public class CognitoProvider {
 
             AttributeType userAttrs = AttributeType.builder()
                     .name("name")
-                    .value(registerDTO.getName())
+                    .value(signUpRequestDTO.getName())
                     .build();
 
             List<AttributeType> userAttrsList = new ArrayList<>();
             userAttrsList.add(userAttrs);
 
+            String secretHash = AwsUtils.calculateSecretHash(cognitoClient.getClientId(),
+                    cognitoClient.getSecretClient(),
+                    signUpRequestDTO.getEmail());
+
             SignUpRequest signUpRequest = SignUpRequest.builder()
                     .clientId(cognitoClient.getClientId())
-                    .secretHash(AwsUtils.calculateSecretHash(cognitoClient.getClientId(),
-                            cognitoClient.getSecretClient(),
-                            registerDTO.getEmail()))
+                    .secretHash(secretHash)
                     .userAttributes(userAttrsList)
-                    .username(registerDTO.getEmail())
-                    .password(registerDTO.getPassword())
+                    .username(signUpRequestDTO.getEmail())
+                    .password(signUpRequestDTO.getPassword())
                     .build();
 
             this.cognitoClient.signUp(signUpRequest);
@@ -104,23 +107,25 @@ public class CognitoProvider {
         }
     }
 
-    public void confirmSignUp(String userPool,ConfirmDTO confirmDTO) throws Exception {
+    public void confirmSignUp(String userPool,SignUpRequestDTO signUpRequestDTO) throws Exception {
         try {
             this.initCognitoClient();
 
             CognitoClientDTO cognitoClient = AwsUtils.getCognitoClient(userPool,this.USER_POOL_IDS);
 
+            String secretHash = AwsUtils.calculateSecretHash(cognitoClient.getClientId(),
+                    cognitoClient.getSecretClient(),
+                    signUpRequestDTO.getEmail());
+
             ConfirmSignUpRequest signUpRequest = ConfirmSignUpRequest.builder()
                     .clientId(cognitoClient.getClientId())
-                    .secretHash(AwsUtils.calculateSecretHash(cognitoClient.getClientId(),
-                            cognitoClient.getSecretClient(),
-                            confirmDTO.getEmail()))
-                    .confirmationCode(confirmDTO.getCode())
-                    .username(confirmDTO.getEmail())
+                    .secretHash(secretHash)
+                    .confirmationCode(signUpRequestDTO.getCode())
+                    .username(signUpRequestDTO.getEmail())
                     .build();
 
             this.cognitoClient.confirmSignUp(signUpRequest);
-
+            this.enableUserMFA(cognitoClient.getUserPoolId(),signUpRequestDTO.getEmail());
         } catch (CognitoIdentityProviderException e) {
             throw new Exception(e.awsErrorDetails().errorMessage());
         } finally {
@@ -128,7 +133,7 @@ public class CognitoProvider {
         }
     }
 
-    public AdminInitiateAuthResponse signIn(String userPool, SignInDTO signInDTO) throws Exception {
+    public AdminInitiateAuthResponse signIn(String userPool, SignInRequestDTO signInRequestDTO) throws Exception {
 
         try {
             this.initCognitoClient();
@@ -136,11 +141,11 @@ public class CognitoProvider {
             CognitoClientDTO cognitoClient = AwsUtils.getCognitoClient(userPool,this.USER_POOL_IDS);
 
             Map<String, String> authParameters = new ConcurrentHashMap<>();
-            authParameters.put("USERNAME", signInDTO.getEmail());
-            authParameters.put("PASSWORD", signInDTO.getPassword());
+            authParameters.put("USERNAME", signInRequestDTO.getEmail());
+            authParameters.put("PASSWORD", signInRequestDTO.getPassword());
             authParameters.put("SECRET_HASH", AwsUtils.calculateSecretHash(cognitoClient.getClientId(),
                     cognitoClient.getSecretClient(),
-                    signInDTO.getEmail()));
+                    signInRequestDTO.getEmail()));
 
 
             AdminInitiateAuthRequest authRequest = AdminInitiateAuthRequest.builder()
@@ -153,12 +158,116 @@ public class CognitoProvider {
             return this.cognitoClient.adminInitiateAuth(authRequest);
 
         } catch (CognitoIdentityProviderException e) {
-            logger.debug(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
+            logger.error(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
                     e.awsErrorDetails().serviceName(),e.awsErrorDetails().errorMessage()));
             throw new Exception(e.awsErrorDetails().errorMessage());
         } finally {
             this.cognitoClient.close();
         }
 
+    }
+
+    private void enableUserMFA(String userPool, String username){
+        AdminSetUserMfaPreferenceRequest mfaRequest = AdminSetUserMfaPreferenceRequest.builder()
+                .username(username)
+                .userPoolId(userPool)
+                .softwareTokenMfaSettings(SoftwareTokenMfaSettingsType.builder()
+                        .enabled(true)
+                        .preferredMfa(true).build()).build();
+
+        cognitoClient.adminSetUserMFAPreference(mfaRequest);
+    }
+
+    public String associateSoftwareToken(String authorization) throws Exception {
+
+        try {
+            this.initCognitoClient();
+            AssociateSoftwareTokenRequest associateRequest = AssociateSoftwareTokenRequest.builder()
+                    .accessToken(authorization.replace("Bearer ","")).build();
+
+            AssociateSoftwareTokenResponse associateResult = this.cognitoClient.associateSoftwareToken(associateRequest);
+
+            return associateResult.secretCode();
+        } catch (CognitoIdentityProviderException e) {
+            logger.debug(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
+                    e.awsErrorDetails().serviceName(),e.awsErrorDetails().errorMessage()));
+            throw new Exception(e.awsErrorDetails().errorMessage());
+        } finally {
+            this.cognitoClient.close();
+        }
+    }
+
+    public String verifySoftwareToken(String authorization, String totpCode) throws Exception {
+        try {
+            this.initCognitoClient();
+
+            VerifySoftwareTokenRequest verifyRequest = VerifySoftwareTokenRequest.builder()
+                    .accessToken(authorization.replace("Bearer ",""))
+                    .userCode(totpCode).build();
+
+            VerifySoftwareTokenResponse verifyResult = this.cognitoClient.verifySoftwareToken(verifyRequest);
+
+
+            return verifyResult.status().toString();
+        } catch (CognitoIdentityProviderException e) {
+            logger.debug(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
+                    e.awsErrorDetails().serviceName(),e.awsErrorDetails().errorMessage()));
+            throw new Exception(e.awsErrorDetails().errorMessage());
+        } finally {
+            this.cognitoClient.close();
+        }
+    }
+
+    public AdminRespondToAuthChallengeResponse respondToAuthChallenge(String userPool, SignInRequestDTO signInRequestDTO) throws Exception {
+        try {
+            this.initCognitoClient();
+            CognitoClientDTO cognitoClient = AwsUtils.getCognitoClient(userPool,this.USER_POOL_IDS);
+
+            Map<String, String> challengeResponses = new HashMap<>();
+
+            challengeResponses.put("USERNAME", signInRequestDTO.getEmail());
+            challengeResponses.put("SOFTWARE_TOKEN_MFA_CODE", signInRequestDTO.getTotpCode());
+            challengeResponses.put("SECRET_HASH", AwsUtils.calculateSecretHash(cognitoClient.getClientId(),
+                    cognitoClient.getSecretClient(),
+                    signInRequestDTO.getEmail()));
+
+            AdminRespondToAuthChallengeRequest respondToAuthChallengeRequest = AdminRespondToAuthChallengeRequest.builder()
+                    .challengeName(ChallengeNameType.SOFTWARE_TOKEN_MFA)
+                    .clientId(cognitoClient.getClientId())
+                    .userPoolId(cognitoClient.getUserPoolId())
+                    .challengeResponses(challengeResponses)
+                    .session(signInRequestDTO.getSession())
+                    .build();
+
+            return this.cognitoClient
+                    .adminRespondToAuthChallenge(respondToAuthChallengeRequest);
+
+        } catch (CognitoIdentityProviderException e) {
+            logger.debug(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
+                    e.awsErrorDetails().serviceName(),e.awsErrorDetails().errorMessage()));
+            throw new Exception(e.awsErrorDetails().errorMessage());
+        } finally {
+            this.cognitoClient.close();
+        }
+    }
+
+    public void signOut(String token) throws Exception {
+        try {
+            this.initCognitoClient();
+
+            GlobalSignOutRequest  globalSignOutRequest =
+                    GlobalSignOutRequest.builder()
+                            .accessToken(token)
+                            .build();
+
+            this.cognitoClient.globalSignOut(globalSignOutRequest);
+
+        } catch (CognitoIdentityProviderException e) {
+            logger.debug(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
+                    e.awsErrorDetails().serviceName(),e.awsErrorDetails().errorMessage()));
+            throw new Exception(e.awsErrorDetails().errorMessage());
+        } finally {
+            this.cognitoClient.close();
+        }
     }
 }

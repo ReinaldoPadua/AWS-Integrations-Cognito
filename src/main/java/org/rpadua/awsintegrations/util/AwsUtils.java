@@ -7,6 +7,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Objects;
 
 public class AwsUtils {
 
@@ -27,8 +28,9 @@ public class AwsUtils {
         }
     }
    public static CognitoClientDTO getCognitoClient(String userPool, String[] UserPoolIds){
+
        String[] userPoolStringArray = Arrays.stream(UserPoolIds).filter(
-                       poll-> poll.contains(userPool)).findFirst().get()
+                       poll-> Objects.nonNull(userPool) && poll.contains(userPool)).findFirst().orElse("")
                .split(":");
         return  new CognitoClientDTO(userPoolStringArray[1],userPoolStringArray[2],userPoolStringArray[3]);
    }
