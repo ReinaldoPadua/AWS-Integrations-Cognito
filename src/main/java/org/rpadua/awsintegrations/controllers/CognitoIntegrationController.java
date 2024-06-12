@@ -124,7 +124,6 @@ public class CognitoIntegrationController {
         try {
 
             this.cognitoProvider.signOut(authorization.replace("Bearer ",""));
-
             return ResponseEntity.status(HttpStatus.valueOf(201)).body("");
 
         }catch (Exception e){
