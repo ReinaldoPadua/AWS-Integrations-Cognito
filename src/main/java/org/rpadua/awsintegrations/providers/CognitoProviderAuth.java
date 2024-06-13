@@ -2,9 +2,6 @@ package org.rpadua.awsintegrations.providers;
 
 import org.rpadua.awsintegrations.DTOs.*;
 import org.rpadua.awsintegrations.util.AwsUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.*;
@@ -15,58 +12,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+
 
 @Service
-public class CognitoProvider {
+public class CognitoProviderAuth extends CognitoProviderAbstract {
 
-    Logger logger = LoggerFactory.getLogger(CognitoProvider.class);
-
-    @Value("${aws.cognito.user-pool-ids}")
-    private String[] USER_POOL_IDS;
-
-    private CognitoIdentityProviderClient cognitoClient;
-
-
-    public CognitoProvider(){
+    public CognitoProviderAuth(){
         super();
     }
 
     private void initCognitoClient(){
         this.cognitoClient = CognitoIdentityProviderClient.builder()
                 .build();
-    }
-
-    public List<UserCognitoDTO> listAllUsers(String userPoll) throws Exception {
-
-        try {
-            this.initCognitoClient();
-
-            CognitoClientDTO cognitoClient = AwsUtils.getCognitoClient(userPoll,this.USER_POOL_IDS);
-
-            ListUsersRequest usersRequest = ListUsersRequest.builder()
-                    .userPoolId(cognitoClient.getUserPoolId()).build();
-
-            ListUsersResponse response = this.cognitoClient.listUsers(usersRequest);
-
-            return response.users().stream().map(userType -> new UserCognitoDTO(
-                    userType.username(),userType.userStatusAsString(),
-                    userType.attributes().stream().filter(
-                            u-> u.name().equals("email")
-                    ).map(AttributeType::value).findFirst().orElse(null),
-                    userType.attributes().stream().filter(
-                            u-> u.name().equals("name")
-                    ).map(AttributeType::value).findFirst().orElse(null)
-            )).collect(Collectors.toList());
-
-        } catch (CognitoIdentityProviderException e) {
-            logger.debug(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
-                    e.awsErrorDetails().serviceName(),e.awsErrorDetails().errorMessage()));
-            throw new Exception(e.awsErrorDetails().errorMessage());
-        } finally {
-            this.cognitoClient.close();
-        }
-
     }
 
     public void signUp(String userPoll, SignUpRequestDTO signUpRequestDTO) throws Exception {
@@ -270,4 +227,5 @@ public class CognitoProvider {
             this.cognitoClient.close();
         }
     }
+
 }

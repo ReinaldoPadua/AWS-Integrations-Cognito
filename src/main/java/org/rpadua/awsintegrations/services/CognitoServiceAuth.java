@@ -3,7 +3,7 @@ package org.rpadua.awsintegrations.services;
 
 import org.rpadua.awsintegrations.DTOs.SignInRequestDTO;
 import org.rpadua.awsintegrations.DTOs.SignInResponseDTO;
-import org.rpadua.awsintegrations.providers.CognitoProvider;
+import org.rpadua.awsintegrations.providers.CognitoProviderAuth;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminInitiateAuthResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminRespondToAuthChallengeResponse;
@@ -12,17 +12,17 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.Authenticat
 import java.util.Objects;
 
 @Service
-public class CognitoService {
+public class CognitoServiceAuth {
 
-    private final CognitoProvider cognitoProvider;
+    private final CognitoProviderAuth cognitoProviderAuth;
 
 
-    public CognitoService(final CognitoProvider cognitoProvider){
-        this.cognitoProvider = cognitoProvider;
+    public CognitoServiceAuth(final CognitoProviderAuth cognitoProviderAuth){
+        this.cognitoProviderAuth = cognitoProviderAuth;
     }
 
     public SignInResponseDTO signIn(String userPool, SignInRequestDTO signInRequestDTO) throws Exception {
-        AdminInitiateAuthResponse response = cognitoProvider.signIn(userPool, signInRequestDTO);
+        AdminInitiateAuthResponse response = cognitoProviderAuth.signIn(userPool, signInRequestDTO);
 
         SignInResponseDTO signInResponse = this.createSignInResponseDTO(response.authenticationResult());
 
@@ -36,7 +36,7 @@ public class CognitoService {
 
     public SignInResponseDTO respondToAuthChallenge(String userPool, SignInRequestDTO signInRequestDTO) throws Exception {
         AdminRespondToAuthChallengeResponse response =
-                this.cognitoProvider.respondToAuthChallenge(userPool, signInRequestDTO);
+                this.cognitoProviderAuth.respondToAuthChallenge(userPool, signInRequestDTO);
 
         return  this.createSignInResponseDTO(response.authenticationResult());
     }
