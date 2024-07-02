@@ -2,10 +2,10 @@ package org.rpadua.awsintegrations.controllers;
 
 import org.json.JSONObject;
 import org.rpadua.awsintegrations.DTOs.SignInRequestDTO;
+import org.rpadua.awsintegrations.providers.CognitoAuthProvider;
+import org.rpadua.awsintegrations.services.CognitoAuthService;
 import org.rpadua.awsintegrations.DTOs.SignInResponseDTO;
 import org.rpadua.awsintegrations.DTOs.SignUpRequestDTO;
-import org.rpadua.awsintegrations.providers.CognitoProviderAuth;
-import org.rpadua.awsintegrations.services.CognitoServiceAuth;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -18,19 +18,19 @@ public class CognitoIntegrationAuthController {
 
     Logger logger = LoggerFactory.getLogger(CognitoIntegrationAuthController.class);
 
-    private final CognitoProviderAuth cognitoProviderAuth;
-    private final CognitoServiceAuth cognitoServiceAuth;
+    private final CognitoAuthProvider cognitoAuthProvider;
+    private final CognitoAuthService cognitoAuthService;
 
-    public CognitoIntegrationAuthController(final CognitoProviderAuth cognitoProviderAuth,
-                                            final CognitoServiceAuth cognitoServiceAuth){
-        this.cognitoProviderAuth = cognitoProviderAuth;
-        this.cognitoServiceAuth = cognitoServiceAuth;
+    public CognitoIntegrationAuthController(final CognitoAuthProvider cognitoAuthProvider,
+                                            final CognitoAuthService cognitoAuthService){
+        this.cognitoAuthProvider = cognitoAuthProvider;
+        this.cognitoAuthService = cognitoAuthService;
     }
 
     @PostMapping("/sign-up")
     public ResponseEntity<?> signUp(@RequestHeader String userPool, @RequestBody SignUpRequestDTO signUpRequestDTO) {
         try {
-            cognitoProviderAuth.signUp(userPool, signUpRequestDTO);
+            cognitoAuthProvider.signUp(userPool, signUpRequestDTO);
             return ResponseEntity.status(HttpStatus.valueOf(201)).body("");
         }catch (Exception e){
             logger.error(e.getMessage());
@@ -42,7 +42,7 @@ public class CognitoIntegrationAuthController {
     public ResponseEntity<?> confirmSignUp(@RequestHeader String userPool,
                                            @RequestBody SignUpRequestDTO signUpRequestDTO) {
         try {
-            cognitoProviderAuth.confirmSignUp(userPool,signUpRequestDTO);
+            cognitoAuthProvider.confirmSignUp(userPool,signUpRequestDTO);
             return ResponseEntity.status(HttpStatus.valueOf(201)).body("");
         }catch (Exception e){
             logger.error(e.getMessage());
@@ -53,7 +53,7 @@ public class CognitoIntegrationAuthController {
     @PostMapping("/sign-in")
     public ResponseEntity<?> signIn(@RequestHeader String userPool,@RequestBody SignInRequestDTO signInRequestDTO) {
         try {
-            SignInResponseDTO signInResponse = this.cognitoServiceAuth.signIn(userPool, signInRequestDTO);
+            SignInResponseDTO signInResponse = this.cognitoAuthService.signIn(userPool, signInRequestDTO);
 
             return ResponseEntity.status(HttpStatus.valueOf(201)).body(signInResponse);
         }catch (Exception e){
@@ -65,7 +65,7 @@ public class CognitoIntegrationAuthController {
     @PostMapping(value="/associate-software-token",produces="application/json")
     public ResponseEntity<?>  associateSoftwareToken(@RequestHeader String authorization) {
         try {
-            String secretCode = this.cognitoProviderAuth.associateSoftwareToken(authorization);
+            String secretCode = this.cognitoAuthProvider.associateSoftwareToken(authorization);
 
             return ResponseEntity.status(HttpStatus.valueOf(201)).body(
                     new JSONObject().put("secretCode",secretCode).toString());
@@ -80,7 +80,7 @@ public class CognitoIntegrationAuthController {
                                                  @RequestBody SignInRequestDTO signInRequestDTO) {
         try {
 
-            String verifyStatus = this.cognitoProviderAuth.verifySoftwareToken(authorization,
+            String verifyStatus = this.cognitoAuthProvider.verifySoftwareToken(authorization,
                     signInRequestDTO.getTotpCode());
 
             return ResponseEntity.status(HttpStatus.valueOf(201)).body(
@@ -97,7 +97,7 @@ public class CognitoIntegrationAuthController {
                                                     @RequestBody SignInRequestDTO signInRequestDTO) {
         try {
 
-            SignInResponseDTO signInResponse = this.cognitoServiceAuth.respondToAuthChallenge(
+            SignInResponseDTO signInResponse = this.cognitoAuthService.respondToAuthChallenge(
                     userPool, signInRequestDTO);
 
             return ResponseEntity.status(HttpStatus.valueOf(201)).body(signInResponse);
@@ -112,7 +112,20 @@ public class CognitoIntegrationAuthController {
     public ResponseEntity<?> signOut(@RequestHeader String authorization) {
         try {
 
-            this.cognitoProviderAuth.signOut(authorization.replace("Bearer ",""));
+            this.cognitoAuthProvider.signOut(authorization.replace("Bearer ",""));
+            return ResponseEntity.status(HttpStatus.valueOf(201)).body("");
+
+        }catch (Exception e){
+            logger.error(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("");
+        }
+    }
+    @PostMapping(value="/{userName}/resend-confirmation-code",produces="application/json")
+    public ResponseEntity<?> resendConfirmationCode(@RequestHeader String userPool,
+                                                    @PathVariable String userName) {
+        try {
+
+            this.cognitoAuthService.resendConfirmationCode(userPool,userName);
             return ResponseEntity.status(HttpStatus.valueOf(201)).body("");
 
         }catch (Exception e){

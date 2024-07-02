@@ -5,9 +5,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 
-public abstract class CognitoProviderAbstract {
+public abstract class CognitoAbstractProvider {
 
-    protected  Logger logger = LoggerFactory.getLogger(CognitoProviderAbstract.class);
+    protected  Logger logger = LoggerFactory.getLogger(CognitoAbstractProvider.class);
 
     @Value("${aws.cognito.user-pool-ids}")
     protected String[] USER_POOL_IDS;

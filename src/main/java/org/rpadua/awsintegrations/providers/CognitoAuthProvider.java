@@ -1,7 +1,9 @@
 package org.rpadua.awsintegrations.providers;
 
-import org.rpadua.awsintegrations.DTOs.*;
 import org.rpadua.awsintegrations.util.AwsUtils;
+import org.rpadua.awsintegrations.DTOs.SignUpRequestDTO;
+import org.rpadua.awsintegrations.DTOs.CognitoClientDTO;
+import org.rpadua.awsintegrations.DTOs.SignInRequestDTO;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.*;
@@ -15,9 +17,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 @Service
-public class CognitoProviderAuth extends CognitoProviderAbstract {
+public class CognitoAuthProvider extends CognitoAbstractProvider {
 
-    public CognitoProviderAuth(){
+    public CognitoAuthProvider(){
         super();
     }
 
@@ -56,9 +58,9 @@ public class CognitoProviderAuth extends CognitoProviderAbstract {
             this.cognitoClient.signUp(signUpRequest);
 
         } catch (CognitoIdentityProviderException e) {
-            logger.debug(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
-                    e.awsErrorDetails().serviceName(),e.awsErrorDetails().errorMessage()));
-            throw new Exception(e.awsErrorDetails().errorMessage());
+           // logger.debug(String.format("Error code: %s - Service: %s - Message: %s",e.awsErrorDetails().errorCode(),
+             //       e.awsErrorDetails().serviceName(),e.awsErrorDetails().errorMessage()));
+            throw new Exception(e.getMessage());
         } finally {
             this.cognitoClient.close();
         }
@@ -228,4 +230,24 @@ public class CognitoProviderAuth extends CognitoProviderAbstract {
         }
     }
 
+    public void resendConfirmationCode(String userPool, String username) throws Exception {
+
+        try {
+            this.initCognitoClient();
+            CognitoClientDTO cognitoClient = AwsUtils.getCognitoClient(userPool, this.USER_POOL_IDS);
+            ResendConfirmationCodeRequest codeRequest = ResendConfirmationCodeRequest.builder()
+                    .clientId(cognitoClient.getClientId())
+                    .username(username)
+                    .build();
+
+            this.cognitoClient.resendConfirmationCode(codeRequest);
+
+        } catch (CognitoIdentityProviderException e) {
+            logger.debug(String.format("Error code: %s - Service: %s - Message: %s", e.awsErrorDetails().errorCode(),
+                    e.awsErrorDetails().serviceName(), e.awsErrorDetails().errorMessage()));
+            throw new Exception(e.awsErrorDetails().errorMessage());
+        } finally {
+            this.cognitoClient.close();
+        }
+    }
 }

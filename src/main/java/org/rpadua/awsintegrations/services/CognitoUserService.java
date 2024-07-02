@@ -2,20 +2,21 @@ package org.rpadua.awsintegrations.services;
 
 
 import org.rpadua.awsintegrations.DTOs.UserCognitoDTO;
-import org.rpadua.awsintegrations.providers.CognitoProviderUser;
+import org.rpadua.awsintegrations.providers.CognitoUserProvider;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.*;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
-public class CognitoServiceUser {
+public class CognitoUserService {
 
-    private final CognitoProviderUser cognitoProviderUser;
+    private final CognitoUserProvider cognitoProviderUser;
 
 
-    public CognitoServiceUser(final CognitoProviderUser cognitoProviderUser){
+    public CognitoUserService(final CognitoUserProvider cognitoProviderUser){
         this.cognitoProviderUser = cognitoProviderUser;
     }
 
@@ -49,5 +50,19 @@ public class CognitoServiceUser {
                         u-> u.name().equals("name")
                 ).map(AttributeType::value).findFirst().orElse(null)
         );
+    }
+
+    public void updateUser(String userPool, UserCognitoDTO userCognito) throws Exception {
+        if(Objects.nonNull(userCognito.getName())){
+            this.cognitoProviderUser.updateUserAttributeName(userPool,userCognito.getEmail(), userCognito.getName());
+        }
+
+        if(userCognito.getStatus().equals("Disable")){
+            this.cognitoProviderUser.disableUser(userPool,userCognito.getEmail());
+        }
+    }
+
+    public void deleteUser(String userPool, String userName) throws Exception {
+        this.cognitoProviderUser.deleteUser(userPool,userName);
     }
 }

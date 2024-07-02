@@ -23,10 +23,12 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-                .csrf(csrf -> csrf.ignoringRequestMatchers( "/cognito-integration/auth/**"))
+                .csrf(csrf -> csrf.ignoringRequestMatchers( "/cognito-integration/auth/**","/v3/**",
+                        "/swagger-ui/**"))
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
-                                .requestMatchers("/cognito-integration/auth/**").permitAll()
+                                .requestMatchers("/cognito-integration/auth/**","/v3/**",
+                                        "/swagger-ui/**").permitAll()
                                 .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2ResourceServer ->

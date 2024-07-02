@@ -2,8 +2,8 @@ package org.rpadua.awsintegrations.services;
 
 
 import org.rpadua.awsintegrations.DTOs.SignInRequestDTO;
+import org.rpadua.awsintegrations.providers.CognitoAuthProvider;
 import org.rpadua.awsintegrations.DTOs.SignInResponseDTO;
-import org.rpadua.awsintegrations.providers.CognitoProviderAuth;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminInitiateAuthResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminRespondToAuthChallengeResponse;
@@ -12,17 +12,17 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.Authenticat
 import java.util.Objects;
 
 @Service
-public class CognitoServiceAuth {
+public class CognitoAuthService {
 
-    private final CognitoProviderAuth cognitoProviderAuth;
+    private final CognitoAuthProvider cognitoAuthProvider;
 
 
-    public CognitoServiceAuth(final CognitoProviderAuth cognitoProviderAuth){
-        this.cognitoProviderAuth = cognitoProviderAuth;
+    public CognitoAuthService(final CognitoAuthProvider cognitoAuthProvider){
+        this.cognitoAuthProvider = cognitoAuthProvider;
     }
 
     public SignInResponseDTO signIn(String userPool, SignInRequestDTO signInRequestDTO) throws Exception {
-        AdminInitiateAuthResponse response = cognitoProviderAuth.signIn(userPool, signInRequestDTO);
+        AdminInitiateAuthResponse response = cognitoAuthProvider.signIn(userPool, signInRequestDTO);
 
         SignInResponseDTO signInResponse = this.createSignInResponseDTO(response.authenticationResult());
 
@@ -36,9 +36,13 @@ public class CognitoServiceAuth {
 
     public SignInResponseDTO respondToAuthChallenge(String userPool, SignInRequestDTO signInRequestDTO) throws Exception {
         AdminRespondToAuthChallengeResponse response =
-                this.cognitoProviderAuth.respondToAuthChallenge(userPool, signInRequestDTO);
+                this.cognitoAuthProvider.respondToAuthChallenge(userPool, signInRequestDTO);
 
         return  this.createSignInResponseDTO(response.authenticationResult());
+    }
+
+    public void resendConfirmationCode(String userPool, String username) throws Exception {
+        this.cognitoAuthProvider.resendConfirmationCode(userPool, username);
     }
 
     private SignInResponseDTO createSignInResponseDTO(AuthenticationResultType authenticationResult) {
